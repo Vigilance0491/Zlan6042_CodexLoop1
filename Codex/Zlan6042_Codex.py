@@ -91,6 +91,14 @@ def main():
         raise SystemExit("ERROR: could not connect")
 
     try:
+        if len(raw_args) == 2 and raw_args[0] in ("ai1", "ai2") and raw_args[1] == "read":
+            ai_raw = read_ai(c)
+            idx = 0 if raw_args[0] == "ai1" else 1
+            ai_v = raw_to_volts(ai_raw[idx])
+            print("OK")
+            print(f"AI{idx + 1} raw: {ai_raw[idx]}  volts: {ai_v:.2f}V")
+            return
+
         if len(raw_args) == 2 and raw_args[0] == "ai" and raw_args[1] == "read":
             ai_raw = read_ai(c)
             ai1_v = raw_to_volts(ai_raw[0])
