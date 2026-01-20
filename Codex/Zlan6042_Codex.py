@@ -1,5 +1,6 @@
 # Zlan6042_Codex.py
-# Set one relay or all relays (DO1..DO4) to open/closed and report DO/DI plus AI1 voltage.
+# Set one or more relays (DO1..DO4) to open/closed and report DO + AI1 voltage.
+# Also supports a separate DI read command.
 
 import argparse
 import inspect
@@ -66,24 +67,21 @@ def raw_to_volts(raw):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Set one relay or all relays and report DO/DI + AI1 voltage.",
+        description=(
+            "Set one or more relays and report DO + AI1 voltage, or read one DI."
+        ),
     )
     parser.add_argument(
-        "relay",
-        help="Relay number (1-4) or 'all'",
-    )
-    parser.add_argument(
-        "state",
-        choices=["open", "closed"],
-        help="Relay state: open or closed",
+        "args",
+        nargs="+",
+        help="Relay/state pairs or DI read command",
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    desired_state = args.state == "closed"
-    relay_arg = str(args.relay).strip().lower()
+    raw_args = [str(a).strip().lower() for a in args.args]
 
     print(
         f"{datetime.now():%Y-%m-%d %H:%M:%S}  Connecting to {IP}:{PORT} device_id={DEVICE_ID}"
@@ -93,25 +91,46 @@ def main():
         raise SystemExit("ERROR: could not connect")
 
     try:
-        if relay_arg == "all":
+        if len(raw_args) == 3 and raw_args[0] == "di" and raw_args[2] == "read":
+            try:
+                di_num = int(raw_args[1])
+            except ValueError:
+                raise SystemExit("ERROR: DI must be 1-4")
+            if di_num < 1 or di_num > 4:
+                raise SystemExit("ERROR: DI must be 1-4")
+            di_states = read_di(c)
+            print("OK")
+            print(f"Digital input DI{di_num}: {di_states[di_num - 1]}")
+            return
+
+        if len(raw_args) == 2 and raw_args[0] == "all":
+            if raw_args[1] not in ("open", "closed"):
+                raise SystemExit("ERROR: state must be open or closed")
+            desired_state = raw_args[1] == "closed"
             for relay in range(1, 5):
                 write_do(c, relay, desired_state)
         else:
-            try:
-                relay_num = int(relay_arg)
-            except ValueError:
-                raise SystemExit("ERROR: relay must be 1-4 or 'all'")
-            if relay_num < 1 or relay_num > 4:
-                raise SystemExit("ERROR: relay must be 1-4 or 'all'")
-            write_do(c, relay_num, desired_state)
+            if len(raw_args) % 2 != 0:
+                raise SystemExit("ERROR: provide relay/state pairs, e.g. 1 open 3 closed")
+            for i in range(0, len(raw_args), 2):
+                relay_arg = raw_args[i]
+                state_arg = raw_args[i + 1]
+                if state_arg not in ("open", "closed"):
+                    raise SystemExit("ERROR: state must be open or closed")
+                try:
+                    relay_num = int(relay_arg)
+                except ValueError:
+                    raise SystemExit("ERROR: relay must be 1-4 or use 'all'")
+                if relay_num < 1 or relay_num > 4:
+                    raise SystemExit("ERROR: relay must be 1-4 or use 'all'")
+                write_do(c, relay_num, state_arg == "closed")
+
         do_states = read_do(c)
-        di_states = read_di(c)
         ai_raw = read_ai(c)
         ai1_v = raw_to_volts(ai_raw[0])
 
         print("OK")
         print(f"Relay states (DO1..DO4): {do_states}")
-        print(f"Digital inputs (DI1..DI4): {di_states}")
         print(f"AI1 raw: {ai_raw[0]}  volts: {ai1_v:.2f}V")
     finally:
         c.close()
