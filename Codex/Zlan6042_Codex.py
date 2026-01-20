@@ -94,8 +94,10 @@ def main():
         if len(raw_args) == 2 and raw_args[0] == "ai" and raw_args[1] == "read":
             ai_raw = read_ai(c)
             ai1_v = raw_to_volts(ai_raw[0])
+            ai2_v = raw_to_volts(ai_raw[1])
             print("OK")
             print(f"AI1 raw: {ai_raw[0]}  volts: {ai1_v:.2f}V")
+            print(f"AI2 raw: {ai_raw[1]}  volts: {ai2_v:.2f}V")
             return
 
         if len(raw_args) == 3 and raw_args[0] == "di" and raw_args[2] == "read":
