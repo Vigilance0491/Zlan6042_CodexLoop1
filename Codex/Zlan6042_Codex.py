@@ -91,6 +91,13 @@ def main():
         raise SystemExit("ERROR: could not connect")
 
     try:
+        if len(raw_args) == 2 and raw_args[0] == "ai" and raw_args[1] == "read":
+            ai_raw = read_ai(c)
+            ai1_v = raw_to_volts(ai_raw[0])
+            print("OK")
+            print(f"AI1 raw: {ai_raw[0]}  volts: {ai1_v:.2f}V")
+            return
+
         if len(raw_args) == 3 and raw_args[0] == "di" and raw_args[2] == "read":
             try:
                 di_num = int(raw_args[1])
