@@ -1,5 +1,5 @@
 # Zlan6042_Codex.py
-# Set a single relay (DO1..DO4) to open/closed and report all relay states plus AI1 voltage.
+# Set one relay or all relays (DO1..DO4) to open/closed and report DO/DI plus AI1 voltage.
 
 import argparse
 import inspect
@@ -12,6 +12,7 @@ PORT = 502
 DEVICE_ID = 1
 
 DO_BASE = 16      # DO1..DO4 coils at 16..19
+DI_BASE = 0       # DI1..DI4 discrete inputs at 0..3
 AI_BASE = 0       # AI1..AI2 input regs at 0..1
 
 TIMEOUT_SECONDS = 2
@@ -48,6 +49,11 @@ def read_do(c):
     return r.bits[:4]
 
 
+def read_di(c):
+    r = must_ok(call_with_unit(c.read_discrete_inputs, DI_BASE, count=4), "Read DI inputs")
+    return r.bits[:4]
+
+
 def read_ai(c):
     r = must_ok(call_with_unit(c.read_input_registers, AI_BASE, count=2), "Read AI regs")
     return r.registers[:2]
@@ -60,13 +66,11 @@ def raw_to_volts(raw):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Set one relay and report all relay states + AI1 voltage.",
+        description="Set one relay or all relays and report DO/DI + AI1 voltage.",
     )
     parser.add_argument(
         "relay",
-        type=int,
-        choices=range(1, 5),
-        help="Relay number (1-4)",
+        help="Relay number (1-4) or 'all'",
     )
     parser.add_argument(
         "state",
@@ -79,6 +83,7 @@ def parse_args():
 def main():
     args = parse_args()
     desired_state = args.state == "closed"
+    relay_arg = str(args.relay).strip().lower()
 
     print(
         f"{datetime.now():%Y-%m-%d %H:%M:%S}  Connecting to {IP}:{PORT} device_id={DEVICE_ID}"
@@ -88,13 +93,25 @@ def main():
         raise SystemExit("ERROR: could not connect")
 
     try:
-        write_do(c, args.relay, desired_state)
+        if relay_arg == "all":
+            for relay in range(1, 5):
+                write_do(c, relay, desired_state)
+        else:
+            try:
+                relay_num = int(relay_arg)
+            except ValueError:
+                raise SystemExit("ERROR: relay must be 1-4 or 'all'")
+            if relay_num < 1 or relay_num > 4:
+                raise SystemExit("ERROR: relay must be 1-4 or 'all'")
+            write_do(c, relay_num, desired_state)
         do_states = read_do(c)
+        di_states = read_di(c)
         ai_raw = read_ai(c)
         ai1_v = raw_to_volts(ai_raw[0])
 
         print("OK")
         print(f"Relay states (DO1..DO4): {do_states}")
+        print(f"Digital inputs (DI1..DI4): {di_states}")
         print(f"AI1 raw: {ai_raw[0]}  volts: {ai1_v:.2f}V")
     finally:
         c.close()
