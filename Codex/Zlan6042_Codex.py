@@ -61,8 +61,8 @@ def read_ai(c):
 
 
 def raw_to_volts(raw):
-    # ZLAN doc: volts = (value/1024)*5
-    return (raw / 1024.0) * 5.0
+    # ZLAN doc: volts = (value/1024)*5, then scale up for external divider
+    return ((raw / 1024.0) * 5.0) * 3.9
 
 
 def parse_args():
